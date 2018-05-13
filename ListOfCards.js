@@ -30,7 +30,7 @@ class ListOfCards extends Component {
         const params = navigation.state.params || {};
 
         return {
-            title: 'WalletCard',
+            title: 'Wallet Card',
             headerStyle: { 'backgroundColor': '#f06292' },
         }
     };
