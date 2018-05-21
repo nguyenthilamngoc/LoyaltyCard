@@ -22,8 +22,9 @@ import Icon from "react-native-vector-icons/Ionicons";
 import styles from "./styles";
 import { CARD_CREATION_QUERY } from "./GraphqlQueries";
 
-const atob = require('base-64').decode;
+const atob = require("base-64").decode;
 const ImagePicker = require("react-native-image-picker");
+import RNFetchBlob from "react-native-fetch-blob";
 // Create the client as outlined in the setup guide
 
 // More info on all the options is below in the README...just some common use cases shown here
@@ -42,14 +43,14 @@ type Props = {
 type State = {
   name: string,
   number: string,
-  imageUri: any,
-  data: any
+  imageUri: string,
+  imageSource: any
 };
 
 const imageRef = firebaseConfig
   .storage()
   .ref("cards")
-  .child(new Date().getTime() + ".jpg");
+  .child(new Date().getTime() + ".jpeg");
 
 class CreateCard extends Component<Props, State> {
   static navigationOptions = ({ navigation }) => {
@@ -73,16 +74,16 @@ class CreateCard extends Component<Props, State> {
     this.state = {
       name: "",
       number: "",
-      imageUri: null,
-      data: ""
+      imageUri: "",
+      imageSource: null
     };
   }
 
   render() {
     let img =
-      this.state.imageUri == null ? null : (
+      this.state.imageSource === null ? null : (
         <Image
-          source={this.state.imageUri}
+          source={this.state.imageSource}
           style={{ height: 163, width: 255 }}
         />
       );
@@ -114,8 +115,8 @@ class CreateCard extends Component<Props, State> {
   }
 
   createCard = async () => {
-    const { name, number } = this.state;
-    const imageUri = this.state.data ? this.state.data : "";
+    const { name, number, imageUri } = this.state;
+    console.log("...start");
     await this.props.cardCreation({
       variables: {
         name,
@@ -123,6 +124,7 @@ class CreateCard extends Component<Props, State> {
         imageUri
       }
     });
+    console.log("...end");
     this.props.navigation.navigate("Home");
   };
 
@@ -141,53 +143,50 @@ class CreateCard extends Component<Props, State> {
       } else if (response.customButton) {
         console.log("User tapped custom button: ", response.customButton);
       } else {
+        const Blob = RNFetchBlob.polyfill.Blob;
+        const fs = RNFetchBlob.fs;
+        const temp = window.XMLHttpRequest; 
+        window.XMLHttpRequest = RNFetchBlob.polyfill.XMLHttpRequest;
+        window.Blob = Blob;
         let source = { uri: response.uri };
-
-        // You can also display the image using data:
-        //let data = { uri: "data:image/jpeg;base64," + response.data };
-        let data = "data:image/jpeg;base64," + response.data;
-
         this.setState({
-          imageUri: source,
-          data: data
+          imageSource: source
         });
 
         var contentType = "image/jpeg";
-        //var b64Data = 'iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg==';
 
-        var blob = this.b64toBlob(response.data, contentType);
-        imageRef
-          .put(blob, { contentType: contentType })
-          .then(function(snapshot) {
-            console.log("Uploaded a data_url string!");
+        const image = response.uri;
+
+        let uploadBlob: any = null;
+        let mime = "image/jpg";
+        fs
+          .readFile(image, "base64")
+          .then(data => {
+            return Blob.build(data, { type: `${mime};BASE64` });
           })
-          .catch(err => console.log(err));
+          .then(blob => {
+            uploadBlob = blob;
+            return imageRef.put(blob, { contentType: mime });
+          })
+          .then(() => {
+            uploadBlob.close();
+            return imageRef.getDownloadURL();
+          })
+          .then(url => {
+            // URL of the image uploaded on Firebase storage
+            url = url.split("&token")[0];
+            console.log(url);
+            this.setState({
+              imageUri: url
+            });
+          })
+          .catch(error => {
+            console.log(error);
+          });
+
       }
     });
   };
-  b64toBlob(b64Data, contentType, sliceSize) {
-    contentType = contentType || "";
-    sliceSize = sliceSize || 512;
-
-    var byteCharacters = atob(b64Data);
-    var byteArrays = [];
-
-    for (var offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-      var slice = byteCharacters.slice(offset, offset + sliceSize);
-
-      var byteNumbers = new Array(slice.length);
-      for (var i = 0; i < slice.length; i++) {
-        byteNumbers[i] = slice.charCodeAt(i);
-      }
-
-      var byteArray = new Uint8Array(byteNumbers);
-
-      byteArrays.push(byteArray);
-    }
-
-    var blob = new Blob(byteArrays, { type: contentType });
-    return blob;
-  }
 }
 
 export default graphql(CARD_CREATION_QUERY, { name: "cardCreation" })(

@@ -37,7 +37,7 @@ class ListOfCards extends Component<Props, State> {
     const params = navigation.state.params || {}
 
     return {
-      title: 'Cards Wallet ABC',
+      title: 'Cards Wallet',
       headerStyle: { backgroundColor: '#f06292' }
     }
   }
