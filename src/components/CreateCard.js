@@ -117,13 +117,18 @@ class CreateCard extends Component<Props, State> {
   createCard = async () => {
     const { name, number, imageUri } = this.state;
     console.log("...start");
-    await this.props.cardCreation({
-      variables: {
-        name,
-        number,
-        imageUri
-      }
-    });
+    try {
+      await this.props.cardCreation({
+        variables: {
+          name,
+          number,
+          imageUri
+        }
+      });
+    } catch (e) {
+      console.log(e);
+    }
+
     console.log("...end");
     this.props.navigation.navigate("Home");
   };
@@ -145,7 +150,9 @@ class CreateCard extends Component<Props, State> {
       } else {
         const Blob = RNFetchBlob.polyfill.Blob;
         const fs = RNFetchBlob.fs;
-        const temp = window.XMLHttpRequest; 
+        const originalBlob = window.Blob;
+        const originalXMLHttpRequest = window.XMLHttpRequest;
+        window.Blob = RNFetchBlob.polyfill.Blob;
         window.XMLHttpRequest = RNFetchBlob.polyfill.XMLHttpRequest;
         window.Blob = Blob;
         let source = { uri: response.uri };
@@ -179,11 +186,12 @@ class CreateCard extends Component<Props, State> {
             this.setState({
               imageUri: url
             });
+            window.Blob = originalBlob;
+            window.XMLHttpRequest = originalXMLHttpRequest;
           })
           .catch(error => {
             console.log(error);
           });
-
       }
     });
   };
